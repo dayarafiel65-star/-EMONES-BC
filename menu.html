@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Pong · Menú</title>
+<style>
+  :root { --j1:#00e5ff; --j2:#ff4fd8; --acc:#ffd23f; --txt:#eef1ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--txt); font-family:system-ui,Arial,sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:12px;
+         background:linear-gradient(135deg,#0a0f2c,#1b0b3a,#071a3a,#0a0f2c); background-size:400% 400%; animation:bg 14s ease infinite; }
+  @keyframes bg { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  h1 { margin:0; font-size:clamp(2rem,6vw,3.4rem); letter-spacing:8px; font-weight:900; background:linear-gradient(90deg,var(--j1),var(--acc),var(--j2),var(--j1)); background-size:300% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:shine 5s linear infinite; }
+  @keyframes shine { to { background-position:300% 0; } }
+  #app { width:100%; max-width:720px; display:flex; flex-direction:column; gap:10px; }
+  kbd { background:#ffffff1f; border:1px solid #ffffff44; border-radius:6px; padding:1px 8px; font-weight:700; }
+  button { font:inherit; font-weight:800; cursor:pointer; border:0; border-radius:999px; color:#111; padding:12px 32px; font-size:1.1rem; background:linear-gradient(90deg,var(--j1),var(--acc),var(--j2)); transition:transform .15s; }
+  button:hover { transform:scale(1.05); }
+  .cfg-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:640px) { .cfg-grid { grid-template-columns:1fr; } }
+  .card { background:#ffffff0d; border:1px solid #ffffff22; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+  .card h3 { margin:0; font-size:.78rem; letter-spacing:2px; text-transform:uppercase; opacity:.75; }
+  .phead { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .fields { display:flex; flex-wrap:wrap; gap:8px 20px; }
+  .field { display:flex; flex-direction:column; gap:4px; }
+  .field > span { font-size:.76rem; opacity:.75; }
+  .field.off { opacity:.35; pointer-events:none; }
+  .seg { display:flex; flex-wrap:wrap; gap:4px; }
+  .opt { font-size:.82rem; padding:5px 11px; color:var(--txt); background:#ffffff14; border:1px solid #ffffff33; }
+  .opt.on { background:linear-gradient(90deg,var(--j1),var(--j2)); color:#111; border-color:transparent; }
+  .sw { width:28px; height:28px; padding:0; border:2px solid transparent; }
+  .sw.on { border-color:#fff; box-shadow:0 0 12px currentColor; }
+  .pw { display:inline-flex; } .pw i { display:block; width:14px; height:48px; }
+  .modes { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  .mode { display:flex; flex-direction:column; align-items:center; gap:4px; width:170px; padding:14px 10px; color:var(--txt); background:#ffffff10; border:1px solid #ffffff33; border-radius:14px; font-size:1rem; }
+  .mode b { font-size:1.8rem; } .mode small { font-size:.72rem; font-weight:500; opacity:.75; }
+  .mode:hover { background:#ffffff22; border-color:var(--acc); }
+  .row { display:flex; align-items:center; gap:10px; } .row input { flex:1; accent-color:var(--acc); } .row output { width:3ch; text-align:right; font-weight:700; }
+  .bar { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<h1>NEON PONG</h1>
+<div id="app"></div>
+<script>
+/* Configuración compartida con juego.html (se guarda en localStorage) */
+const DEF = { mode:'normal', win:5, scene:0, mod:0, random:false, ai:false, diff:1, adapt:true, music:true, c1:'#00e5ff', c2:'#ff4fd8', animal:'random',
+  vol:{ music:70, sfx:70 }, fx:{ text:true, animal:true, flame:true }, p1:{ cr:3, gl:14, st:'bar' }, p2:{ cr:3, gl:14, st:'bar' } };
+let s = {}; try { s = JSON.parse(localStorage.getItem('neonpong.cfg')) || {}; } catch (e) {}
+const cfg = { ...DEF, ...s, vol:{ ...DEF.vol, ...s.vol }, fx:{ ...DEF.fx, ...s.fx }, p1:{ ...DEF.p1, ...s.p1 }, p2:{ ...DEF.p2, ...s.p2 } };
+const save = () => { try { localStorage.setItem('neonpong.cfg', JSON.stringify(cfg)); } catch (e) {} };
+
+const COLORS = ['#00e5ff','#ff4fd8','#ffd23f','#7CFF6B','#ff7a3d','#b388ff'];
+const SCENES = ['Clásico','Hexágono','Triángulo','Octágono'], MODS = ['Sin modificadores','Pilares que se rompen','Pilar de velocidad','Cañón'];
+const DIFF = ['Fácil','Media','Difícil'];
+const CR = [[0,'Cuadradas'],[3,'Redondeadas'],[6,'Píldora'],[-1,'Biseladas']], GL = [[28,'Fuerte'],[14,'Suave'],[0,'Sin brillo']];
+const STY = [['bar','▮ Barra'],['stick','🏏 Palo'],['snake','🐍 Serpiente'],['spring','🌀 Resorte'],['breath','💨 Respirar']];
+const ANIMALS = ['🦁','🐯','🐺','🦊','🦅','🐉','🦈','🐻'];
+let screen = 'main';
+
+const app = document.getElementById('app');
+const opt = (k, v, t, on) => `<button class="opt${on ? ' on' : ''}" data-k="${k}" data-v="${v}">${t}</button>`;
+const seg = a => `<div class="seg">${a.join('')}</div>`;
+const field = (l, inner, c = '') => `<div class="field ${c}"><span>${l}</span>${inner}</div>`;
+const yn = (k, on) => seg([opt(k, true, 'Sí', on), opt(k, false, 'No', !on)]);
+const sw = (k, c) => `<button class="sw${cfg[k] === c ? ' on' : ''}" data-k="${k}" data-v="${c}" aria-label="Color ${c}" style="background:${c};color:${c}"></button>`;
+const slider = (k, label, v) => field(label, `<div class="row"><input type="range" min="0" max="100" value="${v}" data-r="${k}"><output>${v}</output></div>`);
+const preview = (c, p) => `<span class="pw" style="filter:drop-shadow(0 0 ${p.gl / 2}px ${c})"><i style="background:${c};${p.cr < 0 ? 'clip-path:polygon(0 15%,30% 0,70% 0,100% 15%,100% 85%,70% 100%,30% 100%,0 85%);' : `border-radius:${p.st === 'bar' ? p.cr : 7}px;`}"></i></span>`;
+
+const playerCard = n => {
+  const p = cfg['p' + n], c = cfg['c' + n], ia = n === 2 && cfg.ai;
+  return `<div class="card" style="border-color:${c}88">
+    <div class="phead"><h3 style="color:${c};opacity:1">${ia ? '🤖 IA' : 'Jugador ' + n} ${ia ? '' : n === 1 ? '<kbd>W</kbd><kbd>S</kbd>' : '<kbd>↑</kbd><kbd>↓</kbd>'}</h3>${preview(c, p)}</div>
+    <div class="seg">${COLORS.map(x => sw('c' + n, x)).join('')}</div>
+    ${field('Tipo de barra', seg(STY.map(([v, t]) => opt(`p${n}.st`, v, t, p.st === v))))}
+    ${field('Esquinas', seg(CR.map(([v, t]) => opt(`p${n}.cr`, v, t, p.cr === v))), p.st === 'bar' ? '' : 'off')}
+    ${field('Brillo', seg(GL.map(([v, t]) => opt(`p${n}.gl`, v, t, p.gl === v))))}
+  </div>`;
+};
+
+function render() {
+  if (screen === 'main') {
+    app.innerHTML = `<div class="modes">
+      <button class="mode" data-k="mode" data-v="normal"><b>🎮</b><span>Modo normal</span><small>Pong clásico con mapas y power-ups</small></button>
+      <button class="mode" data-k="mode" data-v="dragon"><b>🐉</b><span>Matar al dragón</span><small>Golpea al dragón: la cabeza vale +3</small></button>
+      <button class="mode" data-k="mode" data-v="demo"><b>💥</b><span>Demolición</span><small>Rompe bloques: una pelota por jugador</small></button></div>
+      <div class="bar"><button class="opt" data-k="go" data-v="settings">⚙ Configuración</button></div>`;
+  } else if (screen === 'settings') {
+    app.innerHTML = `<div class="card"><div class="phead"><h3>Volumen</h3><button class="opt" data-k="go" data-v="main">← Volver</button></div>
+      <div class="fields">${slider('vol.music', '🎵 Música', cfg.vol.music)}${slider('vol.sfx', '🔊 Efectos', cfg.vol.sfx)}</div></div>
+      <div class="card"><h3>Animaciones de gol</h3><div class="fields">
+        ${field('Texto', yn('fx.text', cfg.fx.text))}${field('Animal', yn('fx.animal', cfg.fx.animal))}${field('Llama', yn('fx.flame', cfg.fx.flame))}</div>
+        ${field('Qué animal', seg([opt('animal', 'random', '🎲 Al azar', cfg.animal === 'random'), ...ANIMALS.map(a => opt('animal', a, a, cfg.animal === a))]), cfg.fx.animal ? '' : 'off')}</div>
+      <p style="margin:0;opacity:.7;font-size:.85rem;text-align:center">El tipo de barra y los colores se eligen al preparar la partida. En el juego: <kbd>M</kbd> efectos · <kbd>N</kbd> música.</p>`;
+  } else {
+    app.innerHTML = `<div class="card"><div class="phead"><h3>Partida · ${({ normal:'Modo normal', dragon:'Matar al dragón', demo:'Demolición' })[cfg.mode]}</h3>${opt('go', 'main', '← Cambiar modo', false)}</div><div class="fields">` +
+      (cfg.mode === 'normal'
+        ? field('Mapa', seg(SCENES.map((n, i) => opt('scene', i, n, cfg.scene === i)))) +
+          field('Modificadores', seg(MODS.map((n, i) => opt('mod', i, n, cfg.mod === i))), cfg.random ? 'off' : '') +
+          field('Mapa aleatorio', yn('random', cfg.random)) : '') +
+      field('Rival', seg([opt('ai', false, '👥 Jugador 2', !cfg.ai), opt('ai', true, '🤖 IA', cfg.ai)])) +
+      field('Dificultad', seg(DIFF.map((n, i) => opt('diff', i, n, cfg.diff === i))), cfg.ai ? '' : 'off') +
+      field('IA adaptativa', yn('adapt', cfg.adapt), cfg.ai ? '' : 'off') +
+      field(cfg.mode === 'demo' ? 'Puntos para ganar (×4)' : 'Puntos para ganar', seg([3, 5, 7, 10].map(n => opt('win', n, n, cfg.win === n)))) +
+      `</div></div><div class="cfg-grid">${playerCard(1)}${playerCard(2)}</div>
+      <div class="bar"><button data-k="go" data-v="play">▶ Empezar</button><button class="opt" data-k="go" data-v="settings">⚙ Configuración</button></div>`;
+  }
+}
+const set = (k, v) => { if (k.includes('.')) { const [a, b] = k.split('.'); cfg[a][b] = v; } else cfg[k] = v; };
+const parse = v => v === 'true' ? true : v === 'false' ? false : v !== '' && !isNaN(v) ? +v : v;
+
+app.addEventListener('click', e => {
+  const b = e.target.closest('[data-k]'); if (!b) return;
+  const k = b.dataset.k, v = parse(b.dataset.v);
+  if (k === 'go') { if (v === 'play') { save(); location.href = 'juego.html'; return; } screen = v; }
+  else if (k === 'mode') { cfg.mode = v; screen = 'setup'; }
+  else { if (k === 'c1' || k === 'c2') { const o = k === 'c1' ? 'c2' : 'c1'; if (cfg[o] === v) cfg[o] = cfg[k]; } set(k, v); }
+  save(); render();
+});
+app.addEventListener('input', e => {
+  const r = e.target.dataset.r; if (!r) return;
+  set(r, +e.target.value); e.target.nextElementSibling.textContent = e.target.value; save();
+});
+app.addEventListener('change', e => {            // al soltar el deslizador de efectos suena una prueba
+  if (e.target.dataset.r !== 'vol.sfx' || cfg.vol.sfx <= 0) return;
+  try { const a = new AudioContext(), o = a.createOscillator(), g = a.createGain(); o.type = 'square'; o.frequency.value = 440; g.gain.value = 0.06 * cfg.vol.sfx / 70;
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + .15); o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + .15); } catch (x) {}
+});
+render();
+</script>
+</body>
+</html>
